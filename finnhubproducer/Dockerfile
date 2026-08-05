@@ -26,4 +26,8 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Copy code. Build context là thư mục gốc của repo.
 COPY finnhubproducer/ ./finnhubproducer/
 
-CMD ["python", "finnhubproducer/producer.py"]
+# Đứng ngay tại src để đường dẫn tương đối 'schemas/trades.avsc' trong config.py
+# hoạt động y hệt lúc chạy local. Container và máy bạn cùng một hành vi.
+WORKDIR /app/finnhubproducer/src
+
+CMD ["python", "producer.py"]

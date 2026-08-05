@@ -1,0 +1,87 @@
+services:
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    hostname: kafka
+    networks:
+      - finnhub
+    ports:
+      # Truy cập Kafka từ máy host bằng localhost:9093
+      - "9093:9093"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    environment:
+      # KRaft identity
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+
+      # KRaft controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      # Kafka listeners
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: >
+        CONTROLLER:PLAINTEXT,
+        PLAINTEXT:PLAINTEXT,
+        PLAINTEXT_HOST:PLAINTEXT
+
+      KAFKA_LISTENERS: >
+        PLAINTEXT://kafka:9092,
+        CONTROLLER://kafka:29093,
+        PLAINTEXT_HOST://0.0.0.0:9093
+
+      KAFKA_ADVERTISED_LISTENERS: >
+        PLAINTEXT://kafka:9092,
+        PLAINTEXT_HOST://localhost:9093
+
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # Single-node development environment
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+      # Giữ dữ liệu 1 giờ, segment 10MB. Bắt buộc phải siết vì giờ đã có volume:
+      # ~23 trade/giây, mặc định 7 ngày sẽ ăn hết đĩa (máy đang còn ~4GB trống).
+      KAFKA_LOG_RETENTION_HOURS: 1
+      KAFKA_LOG_SEGMENT_BYTES: 10485760
+
+      # KRaft cluster ID — dùng cố định cho local development
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+
+    healthcheck:
+      # Có healthcheck thì producer mới đợi được bằng service_healthy bên dưới.
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9093"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  producer:
+    build:
+      # Context là thư mục gốc repo vì Dockerfile cần pyproject.toml + uv.lock ở đây.
+      context: .
+      dockerfile: finnhubproducer/Dockerfile
+    networks:
+      - finnhub
+    depends_on:
+      kafka:
+        condition: service_healthy
+    env_file:
+      # Lấy FINNHUB_API_TOKEN. File .env không nằm trong image (đã chặn ở .dockerignore).
+      - .env
+    environment:
+      # Ghi đè giá trị trong .env: trong mạng Docker phải dùng tên service + cổng nội bộ,
+      # không phải localhost:9093 (cái đó chỉ dành cho host).
+      KAFKA_SERVER: kafka:9092
+      KAFKA_TOPIC_NAME: market
+      FINNHUB_STOCKS_TICKERS: BINANCE:BTCUSDT,BINANCE:ETHUSDT
+    restart: on-failure
+
+networks:
+  finnhub:
+    driver: bridge
+
+volumes:
+  kafka_data:
