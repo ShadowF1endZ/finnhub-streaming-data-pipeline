@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "avro>=1.12.1",
     "kafka-python>=3.0.9",
     "python-dotenv>=1.2.2",
     "websocket-client>=1.9.0",

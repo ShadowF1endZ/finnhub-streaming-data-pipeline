@@ -14,18 +14,12 @@ logger = logging.getLogger("FinnhubProducer")
 
 
 # --- 1. Nạp Avro schema một lần khi khởi động ---
-# Đọc file .avsc thành đối tượng schema mà thư viện avro hiểu được.
 with open(config.AVRO_SCHEMA_PATH, "r") as f:
     AVRO_SCHEMA = avro.schema.parse(f.read())
 
 
 def avro_encode(record: dict, schema) -> bytes:
-    """
-    Encode một dict Python thành Avro binary theo schema cho trước.
 
-    Vì sao dùng BytesIO: DatumWriter ghi ra một 'stream', ta dùng buffer
-    trong bộ nhớ để lấy ra chuỗi bytes cuối cùng gửi cho Kafka.
-    """
     writer = DatumWriter(schema)
     bytes_writer = io.BytesIO()
     encoder = BinaryEncoder(bytes_writer)

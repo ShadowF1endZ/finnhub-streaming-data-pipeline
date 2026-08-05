@@ -1,0 +1,28 @@
+{
+  "type": "record",
+  "name": "Trade",
+  "namespace": "finnhub.trades",
+  "doc": "Một giao dịch (trade) đơn lẻ nhận từ Finnhub websocket",
+  "fields": [
+    {
+      "name": "symbol",
+      "type": "string",
+      "doc": "Mã tài sản, ví dụ 'BINANCE:BTCUSDT'"
+    },
+    {
+      "name": "price",
+      "type": "double",
+      "doc": "Giá khớp lệnh"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "doc": "Thời điểm giao dịch, đơn vị milliseconds (epoch)"
+    },
+    {
+      "name": "volume",
+      "type": "double",
+      "doc": "Khối lượng giao dịch"
+    }
+  ]
+}
