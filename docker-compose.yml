@@ -42,8 +42,6 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
 
-      # Giữ dữ liệu 1 giờ, segment 10MB. Bắt buộc phải siết vì giờ đã có volume:
-      # ~23 trade/giây, mặc định 7 ngày sẽ ăn hết đĩa (máy đang còn ~4GB trống).
       KAFKA_LOG_RETENTION_HOURS: 1
       KAFKA_LOG_SEGMENT_BYTES: 10485760
 
@@ -69,14 +67,29 @@ services:
       kafka:
         condition: service_healthy
     env_file:
-      # Lấy FINNHUB_API_TOKEN. File .env không nằm trong image (đã chặn ở .dockerignore).
       - .env
     environment:
-      # Ghi đè giá trị trong .env: trong mạng Docker phải dùng tên service + cổng nội bộ,
-      # không phải localhost:9093 (cái đó chỉ dành cho host).
       KAFKA_SERVER: kafka:9092
       KAFKA_TOPIC_NAME: market
       FINNHUB_STOCKS_TICKERS: BINANCE:BTCUSDT,BINANCE:ETHUSDT
+    restart: on-failure
+
+  consumer:
+    build:
+      context: .
+      dockerfile: finnhubconsumer/Dockerfile
+    networks:
+      - finnhub
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_SERVER: kafka:9092
+      KAFKA_TOPIC_NAME: market
+      KAFKA_GROUP_ID: finnhub-consumer
+      # earliest = đọc cả dữ liệu producer đã bơm trước khi consumer khởi động.
+      KAFKA_AUTO_OFFSET_RESET: earliest
+      SUMMARY_INTERVAL: 5
     restart: on-failure
 
 networks:
