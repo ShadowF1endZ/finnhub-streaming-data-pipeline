@@ -10,3 +10,12 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "websocket-client>=1.9.0",
 ]
+
+# Chỉ để gợi ý code / chạy thử job Spark ở máy local: `uv sync --extra spark`.
+# Trong container, PySpark lấy từ image apache/spark nên image producer không
+# phải kéo theo 300MB này (uv sync mặc định không cài extra).
+# Giữ đúng bằng phiên bản Spark trong sparkstreaming/Dockerfile.
+[project.optional-dependencies]
+spark = [
+    "pyspark==3.5.9",
+]

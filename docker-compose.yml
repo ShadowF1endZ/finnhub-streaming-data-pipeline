@@ -74,22 +74,66 @@ services:
       FINNHUB_STOCKS_TICKERS: BINANCE:BTCUSDT,BINANCE:ETHUSDT
     restart: on-failure
 
-  consumer:
-    build:
-      context: .
-      dockerfile: finnhubconsumer/Dockerfile
+  postgres:
+    image: postgres:16-alpine
+    hostname: postgres
     networks:
       - finnhub
+    ports:
+      # psql -h localhost -p 5434 -U finnhub -d finnhub
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: finnhub
+      POSTGRES_USER: finnhub
+      POSTGRES_PASSWORD: finnhub
+      TZ: UTC
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Script trong này chỉ chạy khi volume còn trống (lần khởi tạo đầu tiên).
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finnhub -d finnhub"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  spark-streaming:
+    build:
+      context: .
+      dockerfile: sparkstreaming/Dockerfile
+    networks:
+      - finnhub
+    ports:
+      # Spark UI: http://localhost:4040 — tab Structured Streaming xem input rate,
+      # batch duration và số dòng bị loại vì đến muộn.
+      - "4040:4040"
     depends_on:
       kafka:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     environment:
       KAFKA_SERVER: kafka:9092
       KAFKA_TOPIC_NAME: market
-      KAFKA_GROUP_ID: finnhub-consumer
-      # earliest = đọc cả dữ liệu producer đã bơm trước khi consumer khởi động.
-      KAFKA_AUTO_OFFSET_RESET: earliest
-      SUMMARY_INTERVAL: 5
+      # earliest chỉ có tác dụng ở lần chạy đầu; sau đó Spark theo checkpoint.
+      KAFKA_STARTING_OFFSETS: earliest
+
+      WINDOW_SECONDS: 60
+      WATERMARK_SECONDS: 60
+      TRIGGER_SECONDS: 20
+
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: finnhub
+      POSTGRES_USER: finnhub
+      POSTGRES_PASSWORD: finnhub
+
+      CHECKPOINT_LOCATION: /opt/spark-checkpoints
+      TZ: UTC
+    volumes:
+      # Checkpoint giữ offset Kafka + state của các cửa sổ đang mở. Xoá volume này
+      # là job đọc lại từ đầu và mất các cửa sổ chưa đóng.
+      - spark_checkpoints:/opt/spark-checkpoints
     restart: on-failure
 
 networks:
@@ -98,3 +142,5 @@ networks:
 
 volumes:
   kafka_data:
+  postgres_data:
+  spark_checkpoints:
