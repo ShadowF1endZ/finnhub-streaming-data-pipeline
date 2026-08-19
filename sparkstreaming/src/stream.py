@@ -1,11 +1,3 @@
-"""
-Spark Structured Streaming: Kafka (Avro) -> làm sạch -> gộp theo cửa sổ thời gian -> PostgreSQL.
-
-Job chạy 2 query song song trên cùng một topic:
-  1. metrics : gộp trade theo cửa sổ event time + watermark, upsert vào bảng trade_metrics.
-  2. quality : bản ghi hỏng và bản ghi đến muộn quá watermark, ghi vào trade_quality_events.
-"""
-
 import logging
 
 from pyspark.sql import DataFrame, SparkSession
@@ -108,8 +100,6 @@ def aggregate(clean_df: DataFrame) -> DataFrame:
             F.min("price").alias("min_price"),
             F.max("price").alias("max_price"),
             F.avg("price").alias("avg_price"),
-            # min_by/max_by theo event time = giá mở/đóng cửa sổ, không phụ thuộc
-            # thứ tự bản ghi đến (first/last trong streaming là không xác định).
             F.expr("min_by(price, event_time)").alias("open_price"),
             F.expr("max_by(price, event_time)").alias("close_price"),
             F.max("delay_ms").alias("max_delay_ms"),
@@ -120,7 +110,6 @@ def aggregate(clean_df: DataFrame) -> DataFrame:
             F.col("window.end").alias("window_end"),
             F.col("trade_count"),
             F.col("total_volume"),
-            # VWAP = giá bình quân gia quyền theo khối lượng.
             F.when(F.col("total_volume") > 0, F.col("notional") / F.col("total_volume")).alias("vwap"),
             F.col("open_price"),
             F.col("close_price"),
@@ -162,11 +151,6 @@ def quality_events(clean_df: DataFrame) -> DataFrame:
     )
 
 
-# --- 4. Ghi xuống PostgreSQL ---------------------------------------------------
-
-# Cửa sổ đã ghi vẫn có thể được tính lại khi trade đến muộn, nên phải upsert:
-# ghi đè bảng đệm rồi MERGE một phát sang bảng chính -> chạy lại batch cũ vẫn ra
-# đúng một dòng cho mỗi (symbol, window_start).
 UPSERT_SQL = f"""
 INSERT INTO {config.METRICS_TABLE} AS m (
     symbol, window_start, window_end, trade_count, total_volume, vwap,

@@ -136,6 +136,34 @@ services:
       - spark_checkpoints:/opt/spark-checkpoints
     restart: on-failure
 
+  grafana:
+    image: grafana/grafana-oss:11.3.0
+    networks:
+      - finnhub
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # 3000 và 3005 đã bị project khác chiếm trên máy này.
+      - "3007:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      # Tắt màn hình đổi mật khẩu lần đầu cho môi trường local.
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Datasource provisioning đọc mấy biến này qua cú pháp ${...}.
+      POSTGRES_DB: finnhub
+      POSTGRES_USER: finnhub
+      POSTGRES_PASSWORD: finnhub
+    volumes:
+      # Provisioning: datasource + khai báo nơi chứa dashboard.
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      # Dashboard dạng file JSON. Sửa file là Grafana nạp lại sau ~10s.
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    restart: on-failure
+
 networks:
   finnhub:
     driver: bridge
@@ -144,3 +172,4 @@ volumes:
   kafka_data:
   postgres_data:
   spark_checkpoints:
+  grafana_data:

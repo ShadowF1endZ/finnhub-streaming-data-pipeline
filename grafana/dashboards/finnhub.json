@@ -1,0 +1,216 @@
+{
+  "uid": "finnhub-market",
+  "title": "Finnhub Market Stream",
+  "tags": ["finnhub", "kafka", "spark"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "symbol",
+        "label": "Symbol",
+        "type": "query",
+        "datasource": { "type": "postgres", "uid": "finnhub-pg" },
+        "query": "SELECT DISTINCT symbol FROM trade_metrics ORDER BY 1",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Giá mới nhất",
+      "datasource": { "type": "postgres", "uid": "finnhub-pg" },
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 0 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": { "decimals": 2, "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "text", "value": null }] } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT symbol, close_price FROM trade_metrics_latest WHERE symbol IN ($symbol) ORDER BY symbol"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Độ trễ pipeline (max_delay_ms, cửa sổ mới nhất)",
+      "description": "Khoảng cách giữa event time của trade và lúc Spark xử lý. Tăng dần = pipeline đang tụt lại.",
+      "datasource": { "type": "postgres", "uid": "finnhub-pg" },
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 0 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 5000 },
+            { "color": "red", "value": 30000 }
+          ] } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT symbol, max_delay_ms FROM trade_metrics WHERE window_start = (SELECT max(window_start) FROM trade_metrics) AND symbol IN ($symbol) ORDER BY symbol"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Bản ghi hỏng / đến muộn (1h)",
+      "description": "Đếm từ trade_quality_events. Khác 0 nghĩa là có dữ liệu bị Spark loại.",
+      "datasource": { "type": "postgres", "uid": "finnhub-pg" },
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 0 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": { "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 1 }
+          ] } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT count(*) AS \"Sự kiện\" FROM trade_quality_events WHERE recorded_at > now() - interval '1 hour'"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Giá đóng cửa theo cửa sổ",
+      "datasource": { "type": "postgres", "uid": "finnhub-pg" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 5 },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 5, "showPoints": "never", "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT window_start AS time, symbol AS metric, close_price FROM trade_metrics WHERE $__timeFilter(window_start) AND symbol IN ($symbol) ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "VWAP so với giá trung bình",
+      "description": "VWAP nặng theo khối lượng nên lệch khỏi avg_price khi có lệnh lớn.",
+      "datasource": { "type": "postgres", "uid": "finnhub-pg" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 5 },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 0, "showPoints": "never", "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT window_start AS time, symbol || ' vwap' AS metric, vwap FROM trade_metrics WHERE $__timeFilter(window_start) AND symbol IN ($symbol) UNION ALL SELECT window_start AS time, symbol || ' avg' AS metric, avg_price FROM trade_metrics WHERE $__timeFilter(window_start) AND symbol IN ($symbol) ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Số trade mỗi cửa sổ",
+      "description": "Thông lượng pipeline. Tụt về 0 nghĩa là producer hoặc Spark đã dừng.",
+      "datasource": { "type": "postgres", "uid": "finnhub-pg" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "custom": { "drawStyle": "bars", "lineWidth": 1, "fillOpacity": 60, "showPoints": "never", "stacking": { "mode": "normal" } }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT window_start AS time, symbol AS metric, trade_count FROM trade_metrics WHERE $__timeFilter(window_start) AND symbol IN ($symbol) ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Khối lượng giao dịch mỗi cửa sổ",
+      "datasource": { "type": "postgres", "uid": "finnhub-pg" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 4,
+          "custom": { "drawStyle": "bars", "lineWidth": 1, "fillOpacity": 60, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT window_start AS time, symbol AS metric, total_volume FROM trade_metrics WHERE $__timeFilter(window_start) AND symbol IN ($symbol) ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Sự kiện chất lượng dữ liệu gần nhất",
+      "datasource": { "type": "postgres", "uid": "finnhub-pg" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
+      "options": { "showHeader": true },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT recorded_at, event_type, reason, symbol, price, volume, delay_ms FROM trade_quality_events WHERE $__timeFilter(recorded_at) ORDER BY recorded_at DESC LIMIT 100"
+        }
+      ]
+    }
+  ]
+}

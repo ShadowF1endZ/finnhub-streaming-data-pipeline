@@ -1,0 +1,20 @@
+apiVersion: 1
+
+datasources:
+  - name: Postgres
+    # uid cố định để dashboard JSON tham chiếu được. Đổi uid là dashboard mất datasource.
+    uid: finnhub-pg
+    type: postgres
+    access: proxy
+    # Tên service trong compose, cổng nội bộ — không phải localhost:5432.
+    url: postgres:5432
+    database: ${POSTGRES_DB}
+    user: ${POSTGRES_USER}
+    secureJsonData:
+      password: ${POSTGRES_PASSWORD}
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: false
+    isDefault: true
+    editable: false

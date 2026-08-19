@@ -9,8 +9,6 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
-# Cài dependencies trước (tận dụng Docker layer cache).
-# Chỉ copy lockfile => layer này chỉ rebuild khi dependencies đổi, không phải khi sửa code.
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project --no-dev
@@ -18,16 +16,21 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ---------- runtime: image sạch, không có uv ----------
 FROM python:3.12-slim-bookworm
 
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/app/.venv/bin:$PATH"
+
+# non-root user
+RUN groupadd -r app && useradd -r -g app app
+
 WORKDIR /app
 
 COPY --from=builder /app/.venv /app/.venv
-ENV PATH="/app/.venv/bin:$PATH"
-
-# Copy code. Build context là thư mục gốc của repo.
 COPY finnhubproducer/ ./finnhubproducer/
 
-# Đứng ngay tại src để đường dẫn tương đối 'schemas/trades.avsc' trong config.py
-# hoạt động y hệt lúc chạy local. Container và máy bạn cùng một hành vi.
+RUN chown -R app:app /app
+USER app
+
 WORKDIR /app/finnhubproducer/src
 
 CMD ["python", "producer.py"]

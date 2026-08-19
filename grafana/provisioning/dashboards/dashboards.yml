@@ -1,0 +1,14 @@
+apiVersion: 1
+
+providers:
+  - name: finnhub
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    # Grafana quét lại thư mục mỗi 10s -> sửa file JSON là dashboard tự cập nhật.
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false
