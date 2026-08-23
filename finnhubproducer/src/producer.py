@@ -1,6 +1,7 @@
 import io
 import json
 import logging
+import time
 
 import avro.schema
 from avro.io import BinaryEncoder, DatumWriter
@@ -80,15 +81,23 @@ def on_open(ws):
 
 def run():
     url = f"wss://ws.finnhub.io?token={config.FINNHUB_API_TOKEN}"
-    ws = websocket.WebSocketApp(
-        url,
-        on_message=on_message,
-        on_error=on_error,
-        on_close=on_close,
-        on_open=on_open,
-    )
-    # run_forever tự chạy vòng lặp; ping_interval giữ kết nối sống.
-    ws.run_forever(ping_interval=10)
+    # run_forever() return khi websocket bị đóng (kể cả do mất mạng), nó không tự
+    # reconnect. Nếu không lặp lại ở đây thì process thoát với code 0 và
+    # `restart: on-failure` trong docker-compose sẽ không khởi động lại container.
+    backoff = 1
+    while True:
+        ws = websocket.WebSocketApp(
+            url,
+            on_message=on_message,
+            on_error=on_error,
+            on_close=on_close,
+            on_open=on_open,
+        )
+        # ping_interval giữ kết nối sống.
+        ws.run_forever(ping_interval=10)
+        logger.warning("Mất kết nối websocket, thử lại sau %ds", backoff)
+        time.sleep(backoff)
+        backoff = min(backoff * 2, 30)
 
 
 if __name__ == "__main__":

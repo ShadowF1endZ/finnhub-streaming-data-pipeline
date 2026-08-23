@@ -116,7 +116,12 @@
           "decimals": 2,
           "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 5, "showPoints": "never", "spanNulls": true }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": ".*ETHUSDT.*" },
+            "properties": [{ "id": "custom.axisPlacement", "value": "right" }]
+          }
+        ]
       },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "targets": [
@@ -139,7 +144,12 @@
           "decimals": 2,
           "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 0, "showPoints": "never", "spanNulls": true }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": ".*ETHUSDT.*" },
+            "properties": [{ "id": "custom.axisPlacement", "value": "right" }]
+          }
+        ]
       },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "targets": [
