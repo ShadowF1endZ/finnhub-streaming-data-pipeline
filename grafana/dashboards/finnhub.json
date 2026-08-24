@@ -1,24 +1,37 @@
 {
   "uid": "finnhub-market",
   "title": "Finnhub Market Stream",
-  "tags": ["finnhub", "kafka", "spark"],
+  "tags": [
+    "finnhub",
+    "kafka",
+    "spark"
+  ],
   "timezone": "utc",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
-  "time": { "from": "now-1h", "to": "now" },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
   "templating": {
     "list": [
       {
         "name": "symbol",
         "label": "Symbol",
         "type": "query",
-        "datasource": { "type": "postgres", "uid": "finnhub-pg" },
+        "datasource": {
+          "type": "postgres",
+          "uid": "finnhub-pg"
+        },
         "query": "SELECT DISTINCT symbol FROM trade_metrics ORDER BY 1",
         "refresh": 1,
         "multi": true,
         "includeAll": true,
-        "current": { "text": "All", "value": "$__all" }
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
       }
     ]
   },
@@ -26,17 +39,44 @@
     {
       "type": "stat",
       "title": "Giá mới nhất",
-      "datasource": { "type": "postgres", "uid": "finnhub-pg" },
-      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 0 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "finnhub-pg"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 0
+      },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
         "colorMode": "value",
         "graphMode": "none",
         "textMode": "value_and_name"
       },
       "fieldConfig": {
-        "defaults": { "decimals": 2, "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "text", "value": null }] } },
+        "defaults": {
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "targets": [
@@ -51,22 +91,51 @@
     {
       "type": "stat",
       "title": "Độ trễ pipeline (max_delay_ms, cửa sổ mới nhất)",
-      "description": "Khoảng cách giữa event time của trade và lúc Spark xử lý. Tăng dần = pipeline đang tụt lại.",
-      "datasource": { "type": "postgres", "uid": "finnhub-pg" },
-      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 0 },
+      "description": "Kafka nhận trễ hơn lúc trade xảy ra bao nhiêu. Vàng = quá nửa watermark, đỏ = chạm WATERMARK_SECONDS (60s), tức là sắp mất dữ liệu vào bảng cách ly.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "finnhub-pg"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
         "colorMode": "background",
         "graphMode": "area",
         "textMode": "value_and_name"
       },
       "fieldConfig": {
-        "defaults": { "unit": "ms", "decimals": 0,
-          "thresholds": { "mode": "absolute", "steps": [
-            { "color": "green", "value": null },
-            { "color": "yellow", "value": 5000 },
-            { "color": "red", "value": 30000 }
-          ] } },
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 30000
+              },
+              {
+                "color": "red",
+                "value": 60000
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "targets": [
@@ -82,19 +151,44 @@
       "type": "stat",
       "title": "Bản ghi hỏng / đến muộn (1h)",
       "description": "Đếm từ trade_quality_events. Khác 0 nghĩa là có dữ liệu bị Spark loại.",
-      "datasource": { "type": "postgres", "uid": "finnhub-pg" },
-      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 0 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "finnhub-pg"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "colorMode": "background",
         "graphMode": "none"
       },
       "fieldConfig": {
-        "defaults": { "decimals": 0,
-          "thresholds": { "mode": "absolute", "steps": [
-            { "color": "green", "value": null },
-            { "color": "orange", "value": 1 }
-          ] } },
+        "defaults": {
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "targets": [
@@ -109,21 +203,63 @@
     {
       "type": "timeseries",
       "title": "Giá đóng cửa theo cửa sổ",
-      "datasource": { "type": "postgres", "uid": "finnhub-pg" },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 5 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "finnhub-pg"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
       "fieldConfig": {
         "defaults": {
           "decimals": 2,
-          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 5, "showPoints": "never", "spanNulls": true }
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "spanNulls": true,
+            "axisLabel": "BTC (USD)"
+          }
         },
         "overrides": [
           {
+<<<<<<< Updated upstream
             "matcher": { "id": "byRegexp", "options": ".*ETHUSDT.*" },
             "properties": [{ "id": "custom.axisPlacement", "value": "right" }]
           }
         ]
+=======
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/ETH/"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "ETH (USD)"
+              }
+            ]
+          }
+        ]
       },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+>>>>>>> Stashed changes
+      },
       "targets": [
         {
           "refId": "A",
@@ -131,18 +267,34 @@
           "rawQuery": true,
           "rawSql": "SELECT window_start AS time, symbol AS metric, close_price FROM trade_metrics WHERE $__timeFilter(window_start) AND symbol IN ($symbol) ORDER BY 1"
         }
-      ]
+      ],
+      "description": "Hai mã lệch nhau ~30 lần nên ETH dùng trục Y bên phải; chung trục thì cả hai đường đều thành vạch ngang."
     },
     {
       "type": "timeseries",
-      "title": "VWAP so với giá trung bình",
-      "description": "VWAP nặng theo khối lượng nên lệch khỏi avg_price khi có lệnh lớn.",
-      "datasource": { "type": "postgres", "uid": "finnhub-pg" },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 5 },
+      "title": "VWAP lệch giá trung bình (bps)",
+      "description": "(vwap - avg_price)/avg_price, đơn vị bps. Dương = lệnh khối lượng lớn nằm ở vùng giá cao trong cửa sổ, âm thì ngược lại. Đưa mọi mã về chung một thang nên so sánh được.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "finnhub-pg"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
       "fieldConfig": {
         "defaults": {
           "decimals": 2,
-          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 0, "showPoints": "never", "spanNulls": true }
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true,
+            "axisLabel": "bps"
+          }
         },
         "overrides": [
           {
@@ -151,68 +303,136 @@
           }
         ]
       },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
         {
           "refId": "A",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT window_start AS time, symbol || ' vwap' AS metric, vwap FROM trade_metrics WHERE $__timeFilter(window_start) AND symbol IN ($symbol) UNION ALL SELECT window_start AS time, symbol || ' avg' AS metric, avg_price FROM trade_metrics WHERE $__timeFilter(window_start) AND symbol IN ($symbol) ORDER BY 1"
+          "rawSql": "SELECT window_start AS time, symbol AS metric, (vwap - avg_price) / avg_price * 10000 AS spread_bps FROM trade_metrics WHERE $__timeFilter(window_start) AND symbol IN ($symbol) AND avg_price > 0 ORDER BY 1"
         }
       ]
     },
     {
       "type": "timeseries",
       "title": "Số trade mỗi cửa sổ",
-      "description": "Thông lượng pipeline. Tụt về 0 nghĩa là producer hoặc Spark đã dừng.",
-      "datasource": { "type": "postgres", "uid": "finnhub-pg" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "description": "Không stack: mỗi cột là số trade của riêng một mã. Chỉ tính cửa sổ đã đóng nên cột cuối không bị hụt.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "finnhub-pg"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 14
+      },
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
-          "custom": { "drawStyle": "bars", "lineWidth": 1, "fillOpacity": 60, "showPoints": "never", "stacking": { "mode": "normal" } }
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
         },
         "overrides": []
       },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
         {
           "refId": "A",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT window_start AS time, symbol AS metric, trade_count FROM trade_metrics WHERE $__timeFilter(window_start) AND symbol IN ($symbol) ORDER BY 1"
+          "rawSql": "SELECT window_start AS time, symbol AS metric, trade_count FROM trade_metrics WHERE $__timeFilter(window_start) AND symbol IN ($symbol) AND window_end <= now() ORDER BY 1"
         }
       ]
     },
     {
       "type": "timeseries",
-      "title": "Khối lượng giao dịch mỗi cửa sổ",
-      "datasource": { "type": "postgres", "uid": "finnhub-pg" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "title": "Giá trị giao dịch mỗi cửa sổ (USD)",
+      "datasource": {
+        "type": "postgres",
+        "uid": "finnhub-pg"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
       "fieldConfig": {
         "defaults": {
-          "decimals": 4,
-          "custom": { "drawStyle": "bars", "lineWidth": 1, "fillOpacity": 60, "showPoints": "never" }
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "showPoints": "never"
+          },
+          "unit": "currencyUSD"
         },
         "overrides": []
       },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
         {
           "refId": "A",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT window_start AS time, symbol AS metric, total_volume FROM trade_metrics WHERE $__timeFilter(window_start) AND symbol IN ($symbol) ORDER BY 1"
+          "rawSql": "SELECT window_start AS time, symbol AS metric, total_volume * vwap AS notional_usd FROM trade_metrics WHERE $__timeFilter(window_start) AND symbol IN ($symbol) AND window_end <= now() ORDER BY 1"
         }
-      ]
+      ],
+      "description": "total_volume * vwap. Khối lượng thô khác đơn vị giữa các mã (BTC vs ETH) nên không thể chung trục; qua USD thì so được."
     },
     {
       "type": "table",
       "title": "Sự kiện chất lượng dữ liệu gần nhất",
-      "datasource": { "type": "postgres", "uid": "finnhub-pg" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
-      "options": { "showHeader": true },
-      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "datasource": {
+        "type": "postgres",
+        "uid": "finnhub-pg"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "targets": [
         {
           "refId": "A",
