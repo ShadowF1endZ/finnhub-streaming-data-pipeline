@@ -1,0 +1,185 @@
+# Kafka KRaft single-node.
+#
+# Khác Compose ở hai chỗ cốt lõi:
+#   1. Advertised listener phải là DNS của POD, không phải "kafka" hay "localhost".
+#      Client bootstrap vào Service, broker trả lại địa chỉ quảng bá, client kết nối
+#      lại vào đúng địa chỉ đó. Quảng bá sai là kết nối được lần đầu rồi treo.
+#   2. Node ID và quorum voter phải suy ra từ ordinal của pod, vì mọi pod trong một
+#      StatefulSet dùng chung một khối env — không thể hardcode KAFKA_NODE_ID: 1.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: finnhub
+  labels:
+    app: kafka
+spec:
+  clusterIP: None
+  # Broker phải liên lạc với nhau để bầu controller TRƯỚC khi readinessProbe pass.
+  # Không bật cờ này thì DNS giấu pod chưa ready -> quorum không bao giờ hình thành.
+  publishNotReadyAddresses: true
+  selector:
+    app: kafka
+  ports:
+    - name: internal
+      port: 9092
+      targetPort: 9092
+    - name: controller
+      port: 29093
+      targetPort: 29093
+    - name: host
+      port: 9093
+      targetPort: 9093
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  namespace: finnhub
+spec:
+  serviceName: kafka
+  replicas: 1
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      # Image cp-kafka chạy bằng uid 1000 và KHÔNG tự chown thư mục data.
+      # PV mới được cấp thuộc root -> không có fsGroup là broker không ghi được log dir.
+      securityContext:
+        fsGroup: 1000
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: kafka
+          image: confluentinc/cp-kafka:7.5.0
+          ports:
+            - name: internal
+              containerPort: 9092
+            - name: controller
+              containerPort: 29093
+            - name: host
+              containerPort: 9093
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+
+              # kafka-0 -> ordinal 0 -> node id 1 (KRaft không nhận node id 0).
+              ORDINAL="${HOSTNAME##*-}"
+              export KAFKA_NODE_ID=$((ORDINAL + 1))
+
+              SVC_FQDN="kafka.${POD_NAMESPACE}.svc.cluster.local"
+
+              # Địa chỉ client phải kết nối tới. Pod FQDN ổn định qua mọi lần restart,
+              # khác với IP pod. PLAINTEXT_HOST quảng bá localhost để dùng được với
+              # `kubectl port-forward svc/kafka 9093:9093` từ máy ngoài.
+              export KAFKA_ADVERTISED_LISTENERS="PLAINTEXT://${HOSTNAME}.${SVC_FQDN}:9092,PLAINTEXT_HOST://localhost:9093"
+
+              # Danh sách voter phải khớp đúng số replica, dựng bằng vòng lặp để
+              # scale lên 3 chỉ cần sửa replicas + KAFKA_REPLICAS.
+              VOTERS=""
+              i=0
+              while [ "$i" -lt "$KAFKA_REPLICAS" ]; do
+                VOTERS="${VOTERS},$((i + 1))@kafka-${i}.${SVC_FQDN}:29093"
+                i=$((i + 1))
+              done
+              export KAFKA_CONTROLLER_QUORUM_VOTERS="${VOTERS#,}"
+
+              echo "node.id=${KAFKA_NODE_ID}"
+              echo "advertised.listeners=${KAFKA_ADVERTISED_LISTENERS}"
+              echo "controller.quorum.voters=${KAFKA_CONTROLLER_QUORUM_VOTERS}"
+
+              exec /etc/confluent/docker/run
+          env:
+            # Namespace lấy từ Downward API để manifest không chết cứng vào tên "finnhub".
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: KAFKA_REPLICAS
+              value: "1"
+
+            - name: KAFKA_PROCESS_ROLES
+              value: broker,controller
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: CONTROLLER
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: PLAINTEXT
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+            # Bind 0.0.0.0: pod IP do k8s cấp lúc chạy, không đoán trước được.
+            - name: KAFKA_LISTENERS
+              value: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9093
+
+            # Giữ nguyên cluster id của Compose để dữ liệu cũ đọc lại được.
+            - name: CLUSTER_ID
+              value: MkU3OEVBNTcwNTJENDM2Qk
+
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "1"
+            - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
+              value: "0"
+
+            # Topic 'market' được Job 05 tạo tường minh với số partition cố định.
+            # Tắt auto-create để một cái gõ nhầm tên topic báo lỗi ngay, thay vì
+            # âm thầm sinh topic 1 partition rồi mất song song hoá.
+            - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+              value: "false"
+
+            # Đĩa máy này rất chật -> giữ retention ngắn như Compose.
+            - name: KAFKA_LOG_RETENTION_HOURS
+              value: "1"
+            - name: KAFKA_LOG_SEGMENT_BYTES
+              value: "10485760"
+
+            # Không đặt heap thì JVM lấy 1/4 RAM node (chục GB) rồi bị OOMKill vì limit.
+            - name: KAFKA_HEAP_OPTS
+              value: -Xms512m -Xmx1g
+          volumeMounts:
+            - name: kafka-data
+              mountPath: /var/lib/kafka/data
+          # Lần khởi động đầu phải format storage KRaft nên chậm; startupProbe gánh
+          # phần đó (tối đa 5 phút) để livenessProbe không giết pod giữa chừng.
+          startupProbe:
+            exec:
+              command: ["kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+            periodSeconds: 10
+            failureThreshold: 30
+          # Readiness dùng lệnh thật: có trả lời được API mới cho Service route vào.
+          readinessProbe:
+            exec:
+              command: ["kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 3
+          # Liveness chỉ bắt tay TCP: mỗi lần chạy kafka-broker-api-versions là một
+          # lần khởi động JVM, chạy cả ở liveness lẫn readiness là phí CPU vô ích.
+          livenessProbe:
+            tcpSocket:
+              port: 9092
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: kafka-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi

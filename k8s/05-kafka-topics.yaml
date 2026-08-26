@@ -1,0 +1,56 @@
+# Tạo topic 'market' tường minh.
+#
+# Compose dựa vào auto-create, và auto-create luôn cho topic 1 partition —
+# nghĩa là producer key theo symbol nhưng mọi symbol vẫn dồn vào một partition,
+# không có song song hoá nào cho Spark. Ở đây khai báo 3 partition ngay từ đầu.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-create-topics
+  namespace: finnhub
+spec:
+  # Job chạy trước khi broker kịp ready là chuyện bình thường; cho retry rộng tay.
+  backoffLimit: 10
+  # Dọn Job sau 1 giờ để không tồn đọng pod Completed.
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: kafka-create-topics
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-topics
+          image: confluentinc/cp-kafka:7.5.0
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+
+              BOOTSTRAP="kafka:9092"
+
+              # Service headless chưa có endpoint nào thì DNS trả rỗng -> lệnh fail.
+              # Vòng lặp này chờ broker lên thay vì để Job chết rồi backoff.
+              until kafka-broker-api-versions --bootstrap-server "$BOOTSTRAP" >/dev/null 2>&1; do
+                echo "chờ kafka sẵn sàng..."
+                sleep 5
+              done
+
+              # --if-not-exists: Job có thể chạy lại (retry, apply lại) mà không lỗi.
+              kafka-topics --bootstrap-server "$BOOTSTRAP" \
+                --create --if-not-exists \
+                --topic market \
+                --partitions 3 \
+                --replication-factor 1 \
+                --config retention.ms=3600000 \
+                --config segment.bytes=10485760
+
+              kafka-topics --bootstrap-server "$BOOTSTRAP" --describe --topic market
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

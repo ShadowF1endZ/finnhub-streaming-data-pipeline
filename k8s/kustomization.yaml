@@ -6,6 +6,8 @@ resources:
   - 00-namespace.yaml
   - 02-configmap-postgres-init.yaml
   - 03-postgres.yaml
+  - 04-kafka.yaml
+  - 05-kafka-topics.yaml
 
 secretGenerator:
   - name: finnhub-secrets

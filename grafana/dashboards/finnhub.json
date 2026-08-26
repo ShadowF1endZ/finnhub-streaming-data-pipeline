@@ -227,12 +227,6 @@
         },
         "overrides": [
           {
-<<<<<<< Updated upstream
-            "matcher": { "id": "byRegexp", "options": ".*ETHUSDT.*" },
-            "properties": [{ "id": "custom.axisPlacement", "value": "right" }]
-          }
-        ]
-=======
             "matcher": {
               "id": "byRegexp",
               "options": "/ETH/"
@@ -258,7 +252,6 @@
         "tooltip": {
           "mode": "multi"
         }
->>>>>>> Stashed changes
       },
       "targets": [
         {
