@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: producer
+  namespace: finnhub
+  labels:
+    app: producer
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: producer
+  template:
+    metadata:
+      labels:
+        app: producer
+    spec:
+      initContainers:
+        - name: wait-for-topic
+          image: confluentinc/cp-kafka:7.5.0
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -uo pipefail
+              until kafka-topics --bootstrap-server kafka:9092 --describe --topic market >/dev/null 2>&1; do
+                echo "chờ topic 'market'..."
+                sleep 5
+              done
+              echo "topic 'market' đã sẵn sàng"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      containers:
+        - name: producer
+          image: finnhub-producer:0.1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: FINNHUB_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: finnhub-secrets
+                  key: FINNHUB_API_TOKEN
+            - name: KAFKA_SERVER
+              value: kafka:9092
+            - name: KAFKA_TOPIC_NAME
+              value: market
+            - name: FINNHUB_STOCKS_TICKERS
+              value: BINANCE:BTCUSDT,BINANCE:ETHUSDT
+            - name: TZ
+              value: UTC
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]

@@ -1,0 +1,36 @@
+# Kustomization root nằm ở gốc repo, KHÔNG nằm trong k8s/.
+#
+# Lý do: Kustomize chỉ cho phép tham chiếu file nằm trong hoặc dưới thư mục chứa
+# kustomization.yaml (LoadRestrictionsRootOnly, và `kubectl apply -k` không có cờ
+# để tắt). Cả .env lẫn postgres/init/01_schema.sql đều nằm ngoài k8s/, nên root
+# phải lùi ra một cấp thì mới đọc được cả hai.
+#
+# Chạy:  kubectl apply -k .
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: finnhub
+
+resources:
+  - k8s/00-namespace.yaml
+  - k8s/03-postgres.yaml
+  - k8s/04-kafka.yaml
+  - k8s/05-kafka-topics.yaml
+  - k8s/06-producer.yaml
+
+# Đọc thẳng file schema gốc — cùng một file mà docker-compose bind-mount vào
+# /docker-entrypoint-initdb.d. Trước đây nội dung SQL bị chép tay sang một
+# ConfigMap riêng, tức là hai bản của cùng một thứ và sớm muộn sẽ lệch nhau.
+configMapGenerator:
+  - name: postgres-init
+    files:
+      - 01_schema.sql=postgres/init/01_schema.sql
+
+# Sinh Secret từ .env (file này đã bị .gitignore, không lên git).
+# Kustomize gắn hash nội dung vào tên Secret/ConfigMap, nên đổi giá trị là tên
+# đổi theo, kéo pod template đổi và pod tự restart để nhận giá trị mới —
+# thứ mà Secret viết tay không tự làm được.
+secretGenerator:
+  - name: finnhub-secrets
+    envs:
+      - .env
