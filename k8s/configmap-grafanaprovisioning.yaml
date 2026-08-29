@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource-provisioning
+  namespace: finnhub
+data:
+  postgres.yml: |
+    apiVersion: 1
+
+    datasources:
+      - name: Postgres
+        uid: finnhub-pg
+        type: postgres
+        access: proxy
+        url: postgres:5432
+        database: ${POSTGRES_DB}
+        user: ${POSTGRES_USER}
+        secureJsonData:
+          password: ${POSTGRES_PASSWORD}
+        jsonData:
+          sslmode: disable
+          postgresVersion: 1600
+          timescaledb: false
+        isDefault: true
+        editable: false
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provisioning
+  namespace: finnhub
+data:
+  dashboards.yml: |
+    apiVersion: 1
+
+    providers:
+      - name: finnhub
+        orgId: 1
+        folder: ""
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 10
+        allowUiUpdates: true
+        options:
+          path: /var/lib/grafana/dashboards
+          foldersFromFilesStructure: false
