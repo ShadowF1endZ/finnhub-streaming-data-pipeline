@@ -12,11 +12,14 @@ kind: Kustomization
 namespace: finnhub
 
 resources:
-  - k8s/00-namespace.yaml
-  - k8s/03-postgres.yaml
-  - k8s/04-kafka.yaml
-  - k8s/05-kafka-topics.yaml
-  - k8s/06-producer.yaml
+  - k8s/namespace.yaml
+  - k8s/postgres.yaml
+  - k8s/kafka.yaml
+  - k8s/kafka-topics.yaml
+  - k8s/producer.yaml
+  - k8s/configmap-grafana-provisioning.yaml
+  - k8s/configmap-grafana-dashboard.yaml
+  - k8s/grafana.yaml
 
 # Đọc thẳng file schema gốc — cùng một file mà docker-compose bind-mount vào
 # /docker-entrypoint-initdb.d. Trước đây nội dung SQL bị chép tay sang một
